@@ -68,4 +68,67 @@ Proof.
   reflexivity.
 Qed.
 
+(* ------------------------------------------------------------- *)
+(* Hilbert-Style Propositional Deductive Calculus                *)
+(* ------------------------------------------------------------- *)
+
+(*
+   The deductive system Prf has three axiom schemas and one inference rule:
+   - AxK: A --> (B --> A)
+   - AxS: (A --> (B --> C)) --> ((A --> B) --> (A --> C))
+   - AxContra: ((A --> Bot) --> (B --> Bot)) --> (B --> A)
+   - MP: Modus Ponens (from A --> B and A, infer B)
+*)
+
+Inductive Prf : Fo -> Prop :=
+  | AxK (A B : Fo) : Prf (A --> (B --> A))
+  | AxS (A B C : Fo) : Prf ((A --> (B --> C)) --> ((A --> B) --> (A --> C)))
+  | AxContra (A B : Fo) : Prf (((A --> Bot) --> (B --> Bot)) --> (B --> A))
+  | MP (A B : Fo) : Prf (A --> B) -> Prf A -> Prf B.
+
+(* ------------------------------------------------------------- *)
+(* Deduction Identity: Prf (A --> A)                             *)
+(* ------------------------------------------------------------- *)
+
+Theorem prf_id : forall A : Fo, Prf (A --> A).
+Proof.
+  intro A.
+  apply (MP (A --> (A --> A)) (A --> A)).
+  - apply (MP (A --> ((A --> A) --> A)) ((A --> (A --> A)) --> (A --> A))).
+    + apply AxS.
+    + apply AxK.
+  - apply AxK.
+Qed.
+
+(* ------------------------------------------------------------- *)
+(* Soundness Theorem: Every provable formula is a tautology      *)
+(* ------------------------------------------------------------- *)
+
+Theorem soundness : forall f : Fo, Prf f -> isTauto f.
+Proof.
+  intros f Hprf.
+  induction Hprf as [A B | A B C | A B | A B H_impl IH_impl H_A IH_A].
+  - (* AxK: A --> (B --> A) *)
+    intro v.
+    simpl.
+    destruct (foIb v A); destruct (foIb v B); reflexivity.
+  - (* AxS: (A --> (B --> C)) --> ((A --> B) --> (A --> C)) *)
+    intro v.
+    simpl.
+    destruct (foIb v A); destruct (foIb v B); destruct (foIb v C); reflexivity.
+  - (* AxContra: ((A --> Bot) --> (B --> Bot)) --> (B --> A) *)
+    intro v.
+    simpl.
+    destruct (foIb v A); destruct (foIb v B); reflexivity.
+  - (* Modus Ponens: Prf (A --> B) -> Prf A -> Prf B *)
+    intro v.
+    specialize (IH_impl v).
+    specialize (IH_A v).
+    simpl in IH_impl.
+    rewrite IH_A in IH_impl.
+    simpl in IH_impl.
+    exact IH_impl.
+Qed.
+
+
 

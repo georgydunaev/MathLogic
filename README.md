@@ -10,7 +10,7 @@ MathLogic is a formal logic and automated reasoning repository implementing prop
   - Tautology, contradiction, and satisfiability decision procedures.
   - Normal form conversions: Negation Normal Form (NNF), Conjunctive Normal Form (CNF), Disjunctive Normal Form (DNF).
   - Davis-Putnam-Logemann-Loveland (DPLL) SAT solver with unit propagation and pure literal elimination.
-  - Formal Coq proofs of tautology properties in `Propositional.v`.
+  - Formal Coq proofs of tautology properties, Hilbert deductive calculus (`Prf`), identity theorem, and soundness in `Propositional.v`.
 
 - **First-Order Logic (`FirstOrder.py`)**:
   - Terms: Individual variables (`Var`), constants (`Const`), function applications (`Fn`).
@@ -20,6 +20,9 @@ MathLogic is a formal logic and automated reasoning repository implementing prop
   - Robinson's first-order syntactic unification algorithm with occurs-check.
   - First-order semantic structure evaluator over finite interpretation domains.
   - Clausal first-order resolution refutation theorem prover with factoring and variable standardization apart.
+  - Normal forms and Skolemization: NNF, Prenex normal form (`to_prenex`), Skolem normal form (`skolemize`), and clausal conversion (`formula_to_clauses`).
+  - Automated validity refutation via clausal resolution (`prove_validity_by_resolution`).
+  - Analytic first-order Semantic Tableau prover (`SemanticTableau`, `prove_by_tableau`).
 
 - **Verification and Testing (`tests/`)**:
   - `verify_syntax.py`: Automated syntax and file integrity checker.

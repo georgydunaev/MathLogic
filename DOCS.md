@@ -68,6 +68,18 @@ This repository provides logical systems, theorem proving algorithms, and formal
 - `factor_clause(clause)`: Clause factoring generator.
 - `prove_by_resolution(clauses)`: Automated resolution refutation theorem prover.
 
+### Normal Forms, Skolemization, and Tableau Prover
+- `to_nnf(formula)`: Converts first-order formulas to Negation Normal Form (NNF).
+- `standardize_apart_formula(formula)`: Standardizes all bound variables across quantifiers.
+- `to_prenex(formula)`: Extracts quantifiers to the prefix, producing Prenex Normal Form.
+- `skolemize(formula, drop_universal)`: Replaces existential quantifiers with Skolem functions or constants.
+- `formula_to_clauses(formula)`: Converts an arbitrary first-order formula into clausal form.
+- `prove_validity_by_resolution(formula, max_steps)`: Proves validity of first-order formulas by refuting the negation using resolution.
+- `SignedFormula(formula, sign)`: Signed first-order formula for semantic tableau.
+- `TableauBranch`: Represents and expands individual branches in an analytic tableau.
+- `SemanticTableau`: First-order analytic semantic tableau theorem prover.
+- `prove_by_tableau(formula, max_steps)`: Proves validity using semantic tableau refutation.
+
 ---
 
 ## 3. Coq Formalization (`Propositional.v`)
@@ -80,6 +92,9 @@ This repository provides logical systems, theorem proving algorithms, and formal
 - `isTauto`: Definition of propositional tautology (`forall v, foIb v f = true`).
 - `top_is_tauto`: Verified theorem proving `Top` is a tautology.
 - `conj_tauto`: Verified theorem proving conjunction of tautologies is a tautology.
+- `Prf`: Hilbert-style propositional deductive calculus (`AxK`, `AxS`, `AxContra`, `MP`).
+- `prf_id`: Verified theorem proving syntactic identity `Prf (A --> A)`.
+- `soundness`: Verified theorem proving soundness of Hilbert deduction (`forall f, Prf f -> isTauto f`).
 
 ---
 

@@ -187,6 +187,35 @@ class TestPropositionalCore(unittest.TestCase):
         f_unsat2 = p & q & (~p | ~q)
         self.assertIsNone(sat_solve(f_unsat2))
 
+    def test_hilbert_calculus_axioms_and_identity(self):
+        """Verify that Hilbert deduction axioms and identity are tautologies."""
+        a = Atom("A")
+        b = Atom("B")
+        c = Atom("C")
+
+        # Axiom K: A >> (B >> A)
+        ax_k = a >> (b >> a)
+        self.assertTrue(is_tautology(ax_k))
+
+        # Axiom S: (A >> (B >> C)) >> ((A >> B) >> (A >> C))
+        ax_s = (a >> (b >> c)) >> ((a >> b) >> (a >> c))
+        self.assertTrue(is_tautology(ax_s))
+
+        # Axiom Contra: ((A >> Bot) >> (B >> Bot)) >> (B >> A)
+        ax_contra = ((a >> Bot()) >> (b >> Bot())) >> (b >> a)
+        self.assertTrue(is_tautology(ax_contra))
+
+        # Identity: A >> A
+        ax_id = a >> a
+        self.assertTrue(is_tautology(ax_id))
+
+    def test_coq_propositional_verification(self):
+        """Verify that Propositional.v compiles with coqc with 0 errors."""
+        import subprocess
+        v_file = os.path.join(REPO_ROOT, "Propositional.v")
+        res = subprocess.run(["coqc", v_file], cwd=REPO_ROOT, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"coqc failed on Propositional.v: {res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

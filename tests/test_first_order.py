@@ -14,7 +14,10 @@ if REPO_ROOT not in sys.path:
 from FirstOrder import (
     Var, Const, Fn, Pred, Eq, FoBot, FoTop, FoNot, FoConj, FoDisj, FoImpl, FoIff,
     Forall, Exists, unify_terms, unify_predicates, Structure,
-    FoLiteral, FoClause, resolve_clauses, factor_clause, prove_by_resolution
+    FoLiteral, FoClause, resolve_clauses, factor_clause, prove_by_resolution,
+    to_nnf, standardize_apart_formula, to_prenex, skolemize,
+    to_cnf_matrix, formula_to_clauses, prove_validity_by_resolution,
+    SignedFormula, TableauBranch, SemanticTableau, prove_by_tableau
 )
 
 
@@ -173,6 +176,117 @@ class TestFirstOrderCore(unittest.TestCase):
 
         proved, log = prove_by_resolution([c_ab, c_bc, c_trans, c_goal])
         self.assertTrue(proved)
+
+    def test_to_nnf_and_prenex(self):
+        x = Var("x")
+        y = Var("y")
+        p = Pred("P", [x])
+        q = Pred("Q", [y])
+
+        # ~(forall x. P(x)) => exists x. ~P(x)
+        f1 = ~Forall("x", p)
+        nnf1 = to_nnf(f1)
+        self.assertIsInstance(nnf1, Exists)
+        self.assertEqual(nnf1.var, "x")
+        self.assertIsInstance(nnf1.body, FoNot)
+
+        # ~(exists x. P(x)) => forall x. ~P(x)
+        f2 = ~Exists("x", p)
+        nnf2 = to_nnf(f2)
+        self.assertIsInstance(nnf2, Forall)
+        self.assertEqual(nnf2.var, "x")
+
+        # Prenex normal form for (forall x. P(x)) & (exists y. Q(y))
+        f_conj = Forall("x", p) & Exists("y", q)
+        prenex = to_prenex(f_conj)
+        self.assertIsInstance(prenex, (Forall, Exists))
+
+    def test_skolemization(self):
+        x = Var("x")
+        y = Var("y")
+        z = Var("z")
+
+        # forall x. exists y. P(x, y) => forall x. P(x, sk_f_1(x))
+        f = Forall("x", Exists("y", Pred("P", [x, y])))
+        sk = skolemize(f)
+        self.assertIsInstance(sk, Forall)
+        self.assertIsInstance(sk.body, Pred)
+        self.assertEqual(sk.body.args[0], x)
+        self.assertIsInstance(sk.body.args[1], Fn)
+        self.assertTrue(sk.body.args[1].name.startswith("sk_f_"))
+
+        # Quantifier-free matrix option
+        sk_mat = skolemize(f, drop_universal=True)
+        self.assertIsInstance(sk_mat, Pred)
+
+        # exists z. Q(z) with no universal quantifiers => Q(sk_c_1)
+        f_const = Exists("z", Pred("Q", [z]))
+        sk_c = skolemize(f_const)
+        self.assertIsInstance(sk_c, Pred)
+        self.assertIsInstance(sk_c.args[0], Const)
+        self.assertTrue(sk_c.args[0].name.startswith("sk_c_"))
+
+    def test_formula_to_clauses(self):
+        x = Var("x")
+        c = Const("c")
+        # forall x. (P(x) | ~Q(x)) & R(c)
+        f = Forall("x", (Pred("P", [x]) | ~Pred("Q", [x])) & Pred("R", [c]))
+        clauses = formula_to_clauses(f)
+        self.assertEqual(len(clauses), 2)
+
+    def test_resolution_prover_validity(self):
+        x = Var("x")
+        c = Const("c")
+
+        # Universal Instantiation: (forall x. P(x)) >> P(c) is valid
+        f_ui = Forall("x", Pred("P", [x])) >> Pred("P", [c])
+        proved, log = prove_validity_by_resolution(f_ui)
+        self.assertTrue(proved)
+
+        # Syllogism validity:
+        # ((forall x. (Man(x) >> Mortal(x))) & Man(socrates)) >> Mortal(socrates)
+        soc = Const("socrates")
+        f_syl = (
+            Forall("x", Pred("Man", [x]) >> Pred("Mortal", [x])) & Pred("Man", [soc])
+        ) >> Pred("Mortal", [soc])
+        proved_syl, _ = prove_validity_by_resolution(f_syl)
+        self.assertTrue(proved_syl)
+
+        # Invalid formula: P(a) >> P(b)
+        a = Const("a")
+        b = Const("b")
+        f_invalid = Pred("P", [a]) >> Pred("P", [b])
+        proved_inv, _ = prove_validity_by_resolution(f_invalid)
+        self.assertFalse(proved_inv)
+
+    def test_semantic_tableau_validity(self):
+        x = Var("x")
+        c = Const("c")
+
+        # 1. Identity / Tautology: P(c) >> P(c)
+        f_id = Pred("P", [c]) >> Pred("P", [c])
+        proved_id, _ = prove_by_tableau(f_id)
+        self.assertTrue(proved_id)
+
+        # 2. Universal Instantiation: (forall x. P(x)) >> P(c)
+        f_ui = Forall("x", Pred("P", [x])) >> Pred("P", [c])
+        proved_ui, _ = prove_by_tableau(f_ui)
+        self.assertTrue(proved_ui)
+
+        # 3. Forall implies Exists: (forall x. P(x)) >> (exists x. P(x))
+        f_ae = Forall("x", Pred("P", [x])) >> Exists("x", Pred("P", [x]))
+        proved_ae, _ = prove_by_tableau(f_ae)
+        self.assertTrue(proved_ae)
+
+        # 4. De Morgan quantifier duality: ~(exists x. P(x)) <-> (forall x. ~P(x))
+        f_dm = (~Exists("x", Pred("P", [x]))).iff(Forall("x", ~Pred("P", [x])))
+        proved_dm, _ = prove_by_tableau(f_dm)
+        self.assertTrue(proved_dm)
+
+        # 5. Invalid formula: (exists x. P(x)) >> (forall x. P(x))
+        f_non_valid = Exists("x", Pred("P", [x])) >> Forall("x", Pred("P", [x]))
+        proved_nv, _ = prove_by_tableau(f_non_valid)
+        self.assertFalse(proved_nv)
 
 
 if __name__ == "__main__":

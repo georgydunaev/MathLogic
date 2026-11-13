@@ -789,3 +789,565 @@ def prove_by_resolution(clauses: List[FoClause], max_steps: int = 100) -> Tuple[
         clause_set.update(new_clauses)
 
     return False, log
+
+
+# -------------------------------------------------------------
+# First-Order Normal Forms and Skolemization
+# -------------------------------------------------------------
+
+def to_nnf(formula: FoFormula) -> FoFormula:
+    """
+    Convert a first-order formula to Negation Normal Form (NNF).
+    In NNF, negations appear only immediately before atomic formulas,
+    and implications/biconditionals are eliminated.
+    """
+    if isinstance(formula, (FoBot, FoTop, Pred, Eq)):
+        return formula
+    elif isinstance(formula, FoImpl):
+        return to_nnf(FoDisj(FoNot(formula.left), formula.right))
+    elif isinstance(formula, FoIff):
+        left_impl = FoDisj(FoNot(formula.left), formula.right)
+        right_impl = FoDisj(FoNot(formula.right), formula.left)
+        return to_nnf(FoConj(left_impl, right_impl))
+    elif isinstance(formula, FoConj):
+        return FoConj(to_nnf(formula.left), to_nnf(formula.right))
+    elif isinstance(formula, FoDisj):
+        return FoDisj(to_nnf(formula.left), to_nnf(formula.right))
+    elif isinstance(formula, Forall):
+        return Forall(formula.var, to_nnf(formula.body))
+    elif isinstance(formula, Exists):
+        return Exists(formula.var, to_nnf(formula.body))
+    elif isinstance(formula, FoNot):
+        inner = formula.inner
+        if isinstance(inner, FoBot):
+            return FoTop()
+        elif isinstance(inner, FoTop):
+            return FoBot()
+        elif isinstance(inner, (Pred, Eq)):
+            return FoNot(inner)
+        elif isinstance(inner, FoNot):
+            return to_nnf(inner.inner)
+        elif isinstance(inner, FoConj):
+            return FoDisj(to_nnf(FoNot(inner.left)), to_nnf(FoNot(inner.right)))
+        elif isinstance(inner, FoDisj):
+            return FoConj(to_nnf(FoNot(inner.left)), to_nnf(FoNot(inner.right)))
+        elif isinstance(inner, FoImpl):
+            return FoConj(to_nnf(inner.left), to_nnf(FoNot(inner.right)))
+        elif isinstance(inner, FoIff):
+            return to_nnf(FoDisj(FoConj(inner.left, FoNot(inner.right)),
+                                 FoConj(FoNot(inner.left), inner.right)))
+        elif isinstance(inner, Forall):
+            return Exists(inner.var, to_nnf(FoNot(inner.body)))
+        elif isinstance(inner, Exists):
+            return Forall(inner.var, to_nnf(FoNot(inner.body)))
+        else:
+            raise ValueError(f"Unknown formula type in negation: {type(inner)}")
+    else:
+        raise ValueError(f"Unknown formula type: {type(formula)}")
+
+
+def standardize_apart_formula(formula: FoFormula) -> FoFormula:
+    """
+    Rename bound variables so that every quantifier has a unique variable name,
+    and no bound variable shares a name with any free variable.
+    """
+    used_vars = set(formula.free_vars())
+
+    def _std(f: FoFormula) -> FoFormula:
+        nonlocal used_vars
+        if isinstance(f, (FoBot, FoTop, Pred, Eq)):
+            return f
+        elif isinstance(f, FoNot):
+            return FoNot(_std(f.inner))
+        elif isinstance(f, FoConj):
+            return FoConj(_std(f.left), _std(f.right))
+        elif isinstance(f, FoDisj):
+            return FoDisj(_std(f.left), _std(f.right))
+        elif isinstance(f, FoImpl):
+            return FoImpl(_std(f.left), _std(f.right))
+        elif isinstance(f, FoIff):
+            return FoIff(_std(f.left), _std(f.right))
+        elif isinstance(f, Forall):
+            v = f.var
+            new_v = _fresh_var(v, used_vars) if v in used_vars else v
+            used_vars.add(new_v)
+            body_renamed = f.body.subst({v: Var(new_v)}) if new_v != v else f.body
+            return Forall(new_v, _std(body_renamed))
+        elif isinstance(f, Exists):
+            v = f.var
+            new_v = _fresh_var(v, used_vars) if v in used_vars else v
+            used_vars.add(new_v)
+            body_renamed = f.body.subst({v: Var(new_v)}) if new_v != v else f.body
+            return Exists(new_v, _std(body_renamed))
+        else:
+            raise ValueError(f"Unknown formula type: {type(f)}")
+
+    return _std(formula)
+
+
+def to_prenex(formula: FoFormula) -> FoFormula:
+    """
+    Convert a first-order formula into Prenex Normal Form (PNF):
+    Q1 x1. Q2 x2. ... Qn xn. Matrix
+    where Matrix is quantifier-free.
+    """
+    nnf = to_nnf(formula)
+    std = standardize_apart_formula(nnf)
+
+    def _pull(f: FoFormula) -> Tuple[List[Tuple[str, str]], FoFormula]:
+        if isinstance(f, Forall):
+            quants, matrix = _pull(f.body)
+            return [("forall", f.var)] + quants, matrix
+        elif isinstance(f, Exists):
+            quants, matrix = _pull(f.body)
+            return [("exists", f.var)] + quants, matrix
+        elif isinstance(f, FoConj):
+            q_left, m_left = _pull(f.left)
+            q_right, m_right = _pull(f.right)
+            return q_left + q_right, FoConj(m_left, m_right)
+        elif isinstance(f, FoDisj):
+            q_left, m_left = _pull(f.left)
+            q_right, m_right = _pull(f.right)
+            return q_left + q_right, FoDisj(m_left, m_right)
+        elif isinstance(f, FoNot):
+            return [], f
+        elif isinstance(f, (FoBot, FoTop, Pred, Eq)):
+            return [], f
+        else:
+            raise ValueError(f"Unexpected formula type in prenex extraction: {type(f)}")
+
+    quants, matrix = _pull(std)
+    res = matrix
+    for q_kind, q_var in reversed(quants):
+        if q_kind == "forall":
+            res = Forall(q_var, res)
+        else:
+            res = Exists(q_var, res)
+    return res
+
+
+def skolemize(formula: FoFormula, drop_universal: bool = False) -> FoFormula:
+    """
+    Convert a first-order formula to Skolem Normal Form (SNF).
+    Existential variables are replaced with Skolem functions depending on
+    the universally quantified variables in whose scope they appear.
+    If drop_universal is True, returns the quantifier-free matrix with
+    implicit universal quantification.
+    """
+    prenex = to_prenex(formula)
+
+    univ_vars: List[str] = []
+    subst_map: Dict[str, Term] = {}
+    skolem_id = 1
+
+    cur = prenex
+    while isinstance(cur, (Forall, Exists)):
+        if isinstance(cur, Forall):
+            univ_vars.append(cur.var)
+            cur = cur.body
+        elif isinstance(cur, Exists):
+            if not univ_vars:
+                sk_term: Term = Const(f"sk_c_{skolem_id}")
+            else:
+                sk_term = Fn(f"sk_f_{skolem_id}", [Var(v) for v in univ_vars])
+            skolem_id += 1
+            subst_map[cur.var] = sk_term
+            cur = cur.body
+
+    # Matrix is quantifier-free
+    skolemized_matrix = cur.subst(subst_map)
+
+    if drop_universal or not univ_vars:
+        return skolemized_matrix
+
+    res = skolemized_matrix
+    for v in reversed(univ_vars):
+        res = Forall(v, res)
+    return res
+
+
+def to_cnf_matrix(formula: FoFormula) -> FoFormula:
+    """
+    Convert a quantifier-free first-order formula in NNF into Conjunctive Normal Form (CNF).
+    """
+    def _distribute_disj(left: FoFormula, right: FoFormula) -> FoFormula:
+        if isinstance(left, FoConj):
+            return FoConj(_distribute_disj(left.left, right), _distribute_disj(left.right, right))
+        if isinstance(right, FoConj):
+            return FoConj(_distribute_disj(left, right.left), _distribute_disj(left, right.right))
+        return FoDisj(left, right)
+
+    def _cnf(f: FoFormula) -> FoFormula:
+        if isinstance(f, FoConj):
+            return FoConj(_cnf(f.left), _cnf(f.right))
+        elif isinstance(f, FoDisj):
+            return _distribute_disj(_cnf(f.left), _cnf(f.right))
+        else:
+            return f
+
+    return _cnf(formula)
+
+
+def formula_to_clauses(formula: FoFormula) -> List[FoClause]:
+    """
+    Convert a first-order formula to a list of first-order clauses (FoClause).
+    The formula is skolemized, converted to CNF, and decomposed into clauses.
+    """
+    matrix = skolemize(formula, drop_universal=True)
+    nnf_matrix = to_nnf(matrix)
+    cnf_matrix = to_cnf_matrix(nnf_matrix)
+
+    def _extract_conjs(f: FoFormula) -> List[FoFormula]:
+        if isinstance(f, FoConj):
+            return _extract_conjs(f.left) + _extract_conjs(f.right)
+        return [f]
+
+    def _extract_disjs(f: FoFormula) -> List[FoLiteral]:
+        if isinstance(f, FoDisj):
+            return _extract_disjs(f.left) + _extract_disjs(f.right)
+        elif isinstance(f, Pred):
+            return [FoLiteral(f, is_positive=True)]
+        elif isinstance(f, Eq):
+            return [FoLiteral(Pred("=", [f.left, f.right]), is_positive=True)]
+        elif isinstance(f, FoNot):
+            if isinstance(f.inner, Pred):
+                return [FoLiteral(f.inner, is_positive=False)]
+            elif isinstance(f.inner, Eq):
+                return [FoLiteral(Pred("=", [f.inner.left, f.inner.right]), is_positive=False)]
+            raise ValueError(f"Unexpected negated formula in CNF clause: {f}")
+        elif isinstance(f, FoBot):
+            return []
+        elif isinstance(f, FoTop):
+            return []
+        else:
+            raise ValueError(f"Unexpected subformula in CNF clause: {f}")
+
+    clauses: List[FoClause] = []
+    for conj in _extract_conjs(cnf_matrix):
+        if isinstance(conj, FoTop):
+            continue
+        lits = _extract_disjs(conj)
+        clauses.append(FoClause(lits))
+
+    return clauses
+
+
+def prove_validity_by_resolution(formula: FoFormula, max_steps: int = 100) -> Tuple[bool, List[str]]:
+    """
+    Prove validity of a first-order formula via resolution refutation of its negation.
+    Returns (proved: bool, derivation_log: List[str]).
+    """
+    negated_formula = FoNot(formula)
+    clauses = formula_to_clauses(negated_formula)
+    proved, log = prove_by_resolution(clauses, max_steps=max_steps)
+    return proved, log
+
+
+# -------------------------------------------------------------
+# First-Order Semantic Tableau Prover
+# -------------------------------------------------------------
+
+class SignedFormula:
+    """A signed first-order formula: (sign: bool, formula: FoFormula)."""
+
+    def __init__(self, formula: FoFormula, sign: bool):
+        self.formula = formula
+        self.sign = sign
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, SignedFormula) and self.sign == other.sign and self.formula == other.formula
+
+    def __hash__(self) -> int:
+        return hash(("SignedFormula", self.sign, self.formula))
+
+    def __str__(self) -> str:
+        s = "T" if self.sign else "F"
+        return f"{s}({self.formula})"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+class TableauBranch:
+    """
+    A single branch of a Semantic Tableau.
+    Contains signed formulas and tracks closed / open status.
+    """
+
+    def __init__(
+        self,
+        formulas: Optional[List[SignedFormula]] = None,
+        constants: Optional[Set[Term]] = None,
+        instantiated_gamma: Optional[Dict[SignedFormula, Set[Term]]] = None,
+    ):
+        self.formulas: List[SignedFormula] = list(formulas or [])
+        self.is_closed: bool = False
+        self.closure_reason: Optional[str] = None
+        self.constants: Set[Term] = set(constants or [])
+        self.instantiated_gamma: Dict[SignedFormula, Set[Term]] = {
+            sf: set(terms) for sf, terms in (instantiated_gamma or {}).items()
+        }
+        self._collect_constants()
+
+    def _collect_constants(self) -> None:
+        for sf in self.formulas:
+            for v in sf.formula.free_vars():
+                self.constants.add(Var(v))
+            self._extract_terms_from_formula(sf.formula)
+
+    def _extract_terms_from_formula(self, f: FoFormula) -> None:
+        if isinstance(f, Pred):
+            for a in f.args:
+                if isinstance(a, (Const, Fn)):
+                    self.constants.add(a)
+        elif isinstance(f, Eq):
+            for a in (f.left, f.right):
+                if isinstance(a, (Const, Fn)):
+                    self.constants.add(a)
+        elif isinstance(f, FoNot):
+            self._extract_terms_from_formula(f.inner)
+        elif isinstance(f, (FoConj, FoDisj, FoImpl, FoIff)):
+            self._extract_terms_from_formula(f.left)
+            self._extract_terms_from_formula(f.right)
+        elif isinstance(f, (Forall, Exists)):
+            self._extract_terms_from_formula(f.body)
+
+    def check_closure(self) -> bool:
+        """Check if this branch contains a contradiction and can be closed."""
+        if self.is_closed:
+            return True
+
+        for sf in self.formulas:
+            if sf.sign and isinstance(sf.formula, FoBot):
+                self.is_closed = True
+                self.closure_reason = "T(Bot)"
+                return True
+            if not sf.sign and isinstance(sf.formula, FoTop):
+                self.is_closed = True
+                self.closure_reason = "F(Top)"
+                return True
+
+        pos_atoms = [sf for sf in self.formulas if sf.sign and isinstance(sf.formula, (Pred, Eq))]
+        neg_atoms = [sf for sf in self.formulas if not sf.sign and isinstance(sf.formula, (Pred, Eq))]
+
+        for p in pos_atoms:
+            for n in neg_atoms:
+                if p.formula == n.formula:
+                    self.is_closed = True
+                    self.closure_reason = f"Complementary pair: {p} and {n}"
+                    return True
+                if isinstance(p.formula, Pred) and isinstance(n.formula, Pred):
+                    mgu = unify_predicates(p.formula, n.formula)
+                    if mgu is not None and not mgu:
+                        self.is_closed = True
+                        self.closure_reason = f"Unifying complementary pair: {p} and {n}"
+                        return True
+
+        return False
+
+
+class SemanticTableau:
+    """
+    First-Order Semantic Tableau Prover.
+    Constructs a refutation tree for formula validity (starting from F(formula)).
+    If all branches close, the formula is valid.
+    """
+
+    def __init__(self, formula: FoFormula):
+        self.goal = formula
+        self.branches: List[TableauBranch] = [TableauBranch([SignedFormula(formula, False)])]
+        self.log: List[str] = [f"Initial tableau with F({formula})"]
+        self.param_counter: int = 1
+
+    def is_closed(self) -> bool:
+        return all(b.is_closed for b in self.branches)
+
+    def run(self, max_steps: int = 100) -> bool:
+        """Run tableau expansion rules until all branches close or max_steps is reached."""
+        for step in range(max_steps):
+            for b in self.branches:
+                b.check_closure()
+
+            if self.is_closed():
+                self.log.append(f"All {len(self.branches)} branch(es) closed. Proved valid.")
+                return True
+
+            expanded = False
+
+            # Phase 1: Try Alpha rules (non-branching, propositional)
+            for b_idx, b in enumerate(self.branches):
+                if b.is_closed:
+                    continue
+                for sf_idx, sf in enumerate(b.formulas):
+                    sign, f = sf.sign, sf.formula
+                    if sign and isinstance(f, FoConj):
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(f.left, True))
+                        b.formulas.append(SignedFormula(f.right, True))
+                        self.log.append(f"Alpha T(&): {f} => T({f.left}), T({f.right})")
+                        expanded = True
+                        break
+                    elif not sign and isinstance(f, FoDisj):
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(f.left, False))
+                        b.formulas.append(SignedFormula(f.right, False))
+                        self.log.append(f"Alpha F(|): {f} => F({f.left}), F({f.right})")
+                        expanded = True
+                        break
+                    elif not sign and isinstance(f, FoImpl):
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(f.left, True))
+                        b.formulas.append(SignedFormula(f.right, False))
+                        self.log.append(f"Alpha F(>>): {f} => T({f.left}), F({f.right})")
+                        expanded = True
+                        break
+                    elif sign and isinstance(f, FoNot):
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(f.inner, False))
+                        self.log.append(f"Alpha T(~): {f} => F({f.inner})")
+                        expanded = True
+                        break
+                    elif not sign and isinstance(f, FoNot):
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(f.inner, True))
+                        self.log.append(f"Alpha F(~): {f} => T({f.inner})")
+                        expanded = True
+                        break
+                if expanded:
+                    break
+
+            if expanded:
+                continue
+
+            # Phase 2: Try Delta rules (existential / Skolem parameter)
+            for b_idx, b in enumerate(self.branches):
+                if b.is_closed:
+                    continue
+                for sf_idx, sf in enumerate(b.formulas):
+                    sign, f = sf.sign, sf.formula
+                    if (sign and isinstance(f, Exists)) or (not sign and isinstance(f, Forall)):
+                        c_fresh = Const(f"c_tab_{self.param_counter}")
+                        self.param_counter += 1
+                        b.constants.add(c_fresh)
+                        inst = f.body.subst({f.var: c_fresh})
+                        b.formulas.pop(sf_idx)
+                        b.formulas.append(SignedFormula(inst, sign))
+                        b._extract_terms_from_formula(inst)
+                        rule_name = "Delta T(exists)" if sign else "Delta F(forall)"
+                        self.log.append(f"{rule_name}: {f} instantiated with {c_fresh} => {inst}")
+                        expanded = True
+                        break
+                if expanded:
+                    break
+
+            if expanded:
+                continue
+
+            # Phase 3: Try Beta rules (branching)
+            for b_idx, b in enumerate(self.branches):
+                if b.is_closed:
+                    continue
+                for sf_idx, sf in enumerate(b.formulas):
+                    sign, f = sf.sign, sf.formula
+                    if sign and isinstance(f, FoDisj):
+                        b.formulas.pop(sf_idx)
+                        b1 = TableauBranch(b.formulas + [SignedFormula(f.left, True)], b.constants, b.instantiated_gamma)
+                        b2 = TableauBranch(b.formulas + [SignedFormula(f.right, True)], b.constants, b.instantiated_gamma)
+                        self.branches.pop(b_idx)
+                        self.branches.insert(b_idx, b2)
+                        self.branches.insert(b_idx, b1)
+                        self.log.append(f"Beta T(|): {f} branched into T({f.left}) and T({f.right})")
+                        expanded = True
+                        break
+                    elif not sign and isinstance(f, FoConj):
+                        b.formulas.pop(sf_idx)
+                        b1 = TableauBranch(b.formulas + [SignedFormula(f.left, False)], b.constants, b.instantiated_gamma)
+                        b2 = TableauBranch(b.formulas + [SignedFormula(f.right, False)], b.constants, b.instantiated_gamma)
+                        self.branches.pop(b_idx)
+                        self.branches.insert(b_idx, b2)
+                        self.branches.insert(b_idx, b1)
+                        self.log.append(f"Beta F(&): {f} branched into F({f.left}) and F({f.right})")
+                        expanded = True
+                        break
+                    elif sign and isinstance(f, FoImpl):
+                        b.formulas.pop(sf_idx)
+                        b1 = TableauBranch(b.formulas + [SignedFormula(f.left, False)], b.constants, b.instantiated_gamma)
+                        b2 = TableauBranch(b.formulas + [SignedFormula(f.right, True)], b.constants, b.instantiated_gamma)
+                        self.branches.pop(b_idx)
+                        self.branches.insert(b_idx, b2)
+                        self.branches.insert(b_idx, b1)
+                        self.log.append(f"Beta T(>>): {f} branched into F({f.left}) and T({f.right})")
+                        expanded = True
+                        break
+                    elif sign and isinstance(f, FoIff):
+                        b.formulas.pop(sf_idx)
+                        b1 = TableauBranch(b.formulas + [SignedFormula(f.left, True), SignedFormula(f.right, True)], b.constants, b.instantiated_gamma)
+                        b2 = TableauBranch(b.formulas + [SignedFormula(f.left, False), SignedFormula(f.right, False)], b.constants, b.instantiated_gamma)
+                        self.branches.pop(b_idx)
+                        self.branches.insert(b_idx, b2)
+                        self.branches.insert(b_idx, b1)
+                        self.log.append(f"Beta T(<->): {f} branched")
+                        expanded = True
+                        break
+                    elif not sign and isinstance(f, FoIff):
+                        b.formulas.pop(sf_idx)
+                        b1 = TableauBranch(b.formulas + [SignedFormula(f.left, True), SignedFormula(f.right, False)], b.constants, b.instantiated_gamma)
+                        b2 = TableauBranch(b.formulas + [SignedFormula(f.left, False), SignedFormula(f.right, True)], b.constants, b.instantiated_gamma)
+                        self.branches.pop(b_idx)
+                        self.branches.insert(b_idx, b2)
+                        self.branches.insert(b_idx, b1)
+                        self.log.append(f"Beta F(<->): {f} branched")
+                        expanded = True
+                        break
+                if expanded:
+                    break
+
+            if expanded:
+                continue
+
+            # Phase 4: Try Gamma rules (universal instantiation)
+            for b_idx, b in enumerate(self.branches):
+                if b.is_closed:
+                    continue
+                for sf_idx, sf in enumerate(b.formulas):
+                    sign, f = sf.sign, sf.formula
+                    is_gamma = (sign and isinstance(f, Forall)) or (not sign and isinstance(f, Exists))
+                    if is_gamma:
+                        if not b.constants:
+                            default_c = Const("c_0")
+                            b.constants.add(default_c)
+
+                        already_done = b.instantiated_gamma.setdefault(sf, set())
+                        needed = [t for t in b.constants if t not in already_done]
+                        if needed:
+                            term = needed[0]
+                            already_done.add(term)
+                            inst = f.body.subst({f.var: term})
+                            new_sf = SignedFormula(inst, sign)
+                            b.formulas.append(new_sf)
+                            b._extract_terms_from_formula(inst)
+                            rule_name = "Gamma T(forall)" if sign else "Gamma F(exists)"
+                            self.log.append(f"{rule_name}: {f} instantiated with {term} => {inst}")
+                            expanded = True
+                            break
+                if expanded:
+                    break
+
+            if not expanded:
+                break
+
+        for b in self.branches:
+            b.check_closure()
+
+        return self.is_closed()
+
+
+def prove_by_tableau(formula: FoFormula, max_steps: int = 100) -> Tuple[bool, List[str]]:
+    """
+    Attempt to prove validity of a first-order formula using Semantic Tableau.
+    Returns (proved: bool, derivation_log: List[str]).
+    """
+    tableau = SemanticTableau(formula)
+    proved = tableau.run(max_steps=max_steps)
+    return proved, tableau.log
+
