@@ -44,10 +44,28 @@ End foIb_sec.
 
 
 
-(*Proof.
-destruct f.
-Show Proof.
-Definition isTauto := forall.
+(* Tautology definition: a formula is a tautology if it evaluates to true under all valuations. *)
+Definition isTauto (f:Fo) : Prop := forall (v:Valuations), foIb v f = true.
+
+(* Theorem: Top is a tautology *)
+Theorem top_is_tauto : isTauto Top.
 Proof.
-Defined.*)
+  intro v.
+  unfold Top.
+  simpl.
+  reflexivity.
+Qed.
+
+(* Theorem: Conjunction of tautologies is a tautology *)
+Theorem conj_tauto (f1 f2 : Fo) :
+  isTauto f1 -> isTauto f2 -> isTauto (f1 -/\ f2).
+Proof.
+  intros H1 H2 v.
+  simpl.
+  rewrite (H1 v).
+  rewrite (H2 v).
+  simpl.
+  reflexivity.
+Qed.
+
 

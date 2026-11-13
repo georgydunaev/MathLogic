@@ -11,3 +11,6 @@ verify:
 # Run the tests
 run_tests:
 	python3 -m unittest discover tests
+
+test: run_tests
+
