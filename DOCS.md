@@ -98,6 +98,53 @@ This repository provides logical systems, theorem proving algorithms, and formal
 
 ---
 
+## 4. Equational Reasoning and Term Rewriting (`Equational.py`)
+
+### Subterm Positions and Navigation
+- `get_subterm(term, pos)`: Returns subterm at given tree position.
+- `replace_subterm(term, pos, replacement)`: Replaces subterm at tree position.
+- `all_subterm_positions(term, non_variable_only)`: Enumerates all subterm positions.
+- `all_literal_positions(lit, non_variable_only)`: Enumerates subterm positions in a literal.
+- `replace_literal_subterm(lit, pos, replacement)`: Replaces subterm in a literal.
+- `is_equality_literal(lit)`: Checks if literal is an equality atom.
+- `make_equality_literal(left, right, is_positive)`: Constructs an equality literal.
+
+### Equality Axioms and Congruence Generators
+- `equality_reflexivity_axiom()`: Produces `forall x. (x = x)`.
+- `equality_symmetry_axiom()`: Produces `forall x y. (x = y -> y = x)`.
+- `equality_transitivity_axiom()`: Produces `forall x y z. ((x = y & y = z) -> x = z)`.
+- `function_congruence_axiom(func_name, arity)`: Produces function monotonicity axiom.
+- `predicate_congruence_axiom(pred_name, arity)`: Produces predicate substitution axiom.
+- `generate_equality_axioms(signature)`: Generates full equality axioms for a signature.
+- `generate_equality_clauses(signature)`: Generates clausal representation of equality axioms.
+
+### Polynomial-Time Ground Congruence Closure
+- `CongruenceClosure`: Equational decision procedure using Union-Find, signature tables, and use lists.
+- `cc.add_term(term)`: Inserts term DAG and returns representative ID.
+- `cc.merge(t1, t2)`: Asserts ground equation and propagates congruences along use lists.
+- `cc.are_equal(t1, t2)`: Decides whether `t1 = t2` modulo merged equations.
+- `check_ground_validity(hypotheses, query)`: Ground equational entailment checker.
+- `check_ground_satisfiability(equations, disequations)`: Decides satisfiability of ground equality and disequality sets.
+
+### Paramodulation and Equational Resolution Prover
+- `paramodulate(c1, c2, step)`: Computes all paramodulants between from-clause and into-clause.
+- `equality_resolution(clause)`: Reflexivity resolution on negative equality literals.
+- `prove_by_paramodulation(clauses, max_steps)`: Full first-order equational resolution refutation prover.
+- `prove_equational_validity(formula, max_steps)`: Refutes negation of formula via Skolemization and paramodulation.
+
+### Term Rewriting Systems (TRS) and Knuth-Bendix Completion
+- `RewriteRule(lhs, rhs)`: Validated oriented rewrite rule.
+- `match_term(pattern, target)`: One-way syntactic pattern matcher.
+- `rewrite_step(term, rules)`: Single-step subterm rewrite.
+- `normalize_term(term, rules)`: Full term normalization to normal form.
+- `lpo_greater(s, t, precedence)`: Well-founded reduction ordering via Lexicographic Path Ordering.
+- `critical_pairs(rule1, rule2, step)`: Computes all critical pair overlaps.
+- `knuth_bendix_completion(equations, precedence, max_iterations)`: Completes equational theories into convergent rewrite systems.
+- `solve_word_problem(equations, query, precedence)`: Decides equational word problems via convergent TRS normalization.
+
+
+---
+
 ## 4. Verification and Testing
 
 Run the syntax verification script:

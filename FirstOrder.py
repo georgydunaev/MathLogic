@@ -1351,3 +1351,25 @@ def prove_by_tableau(formula: FoFormula, max_steps: int = 100) -> Tuple[bool, Li
     proved = tableau.run(max_steps=max_steps)
     return proved, tableau.log
 
+
+# -------------------------------------------------------------
+# First-Order Equational Reasoning and Term Rewriting Integration
+# -------------------------------------------------------------
+try:
+    from Equational import (
+        get_subterm, replace_subterm, all_subterm_positions,
+        all_literal_positions, replace_literal_subterm,
+        is_equality_literal, make_equality_literal,
+        equality_reflexivity_axiom, equality_symmetry_axiom, equality_transitivity_axiom,
+        function_congruence_axiom, predicate_congruence_axiom,
+        extract_signature_from_formulas, extract_signature_from_clauses,
+        generate_equality_axioms, generate_equality_clauses,
+        CongruenceClosure, check_ground_validity, check_ground_satisfiability,
+        paramodulate, equality_resolution, prove_by_paramodulation, prove_equational_validity,
+        RewriteRule, match_term, rewrite_step, normalize_term,
+        lpo_greater, critical_pairs, knuth_bendix_completion, solve_word_problem
+    )
+except ImportError:
+    pass
+
+

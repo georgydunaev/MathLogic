@@ -24,10 +24,18 @@ MathLogic is a formal logic and automated reasoning repository implementing prop
   - Automated validity refutation via clausal resolution (`prove_validity_by_resolution`).
   - Analytic first-order Semantic Tableau prover (`SemanticTableau`, `prove_by_tableau`).
 
+- **Equational Reasoning and Term Rewriting (`Equational.py`)**:
+  - Subterm tree navigation and replacement (`get_subterm`, `replace_subterm`, `all_subterm_positions`, `all_literal_positions`, `replace_literal_subterm`).
+  - Formal equality predicate and congruence axioms generator (`generate_equality_axioms`, `generate_equality_clauses`).
+  - Polynomial-time ground Congruence Closure algorithm (`CongruenceClosure`, `check_ground_validity`, `check_ground_satisfiability`).
+  - Paramodulation inference rule and equality resolution for first-order equational resolution refutations (`paramodulate`, `equality_resolution`, `prove_by_paramodulation`, `prove_equational_validity`).
+  - Term Rewriting System (TRS) with syntactic matching (`match_term`), term normalization (`normalize_term`), Lexicographic Path Ordering (`lpo_greater`), critical pair calculation (`critical_pairs`), and Knuth-Bendix completion (`knuth_bendix_completion`, `solve_word_problem`).
+
 - **Verification and Testing (`tests/`)**:
   - `verify_syntax.py`: Automated syntax and file integrity checker.
   - `test_propositional.py`: Unit test suite for propositional logic and DPLL.
   - `test_first_order.py`: Unit test suite for FOL terms, substitution, unification, models, and resolution.
+  - `test_equational.py`: Unit test suite for congruence closure, paramodulation, and Knuth-Bendix completion.
 
 ## Quick Start
 
