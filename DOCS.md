@@ -142,10 +142,52 @@ This repository provides logical systems, theorem proving algorithms, and formal
 - `knuth_bendix_completion(equations, precedence, max_iterations)`: Completes equational theories into convergent rewrite systems.
 - `solve_word_problem(equations, query, precedence)`: Decides equational word problems via convergent TRS normalization.
 
+---
+
+## 5. Herbrand Theory, Skolemization, and Tableaux (`Herbrand.py`)
+
+### Robinson First-Order Unification
+- `robinson_unify(t1, t2)`: Syntactic unification of first-order terms with strict occurs-check.
+- `robinson_unify_all(terms)`: Simultaneous unification of a list of terms.
+- `robinson_unify_predicates(p1, p2)`: Unification of predicate formulas.
+- `robinson_unify_atoms(a1, a2)`: Unification across atomic predicates and equality atoms.
+
+### Prenex Normal Form and Quantifier Movement
+- `is_prenex(formula)`: Checks whether a formula is in Prenex Normal Form.
+- `split_prenex(formula)`: Separates quantifier prefix from quantifier-free matrix.
+- `to_prenex_by_movement(formula)`: Classical quantifier movement rules pushing quantifiers to the prefix, respecting variable captures and polarity flips in implications.
+- `prenex_normal_form(formula, use_nnf)`: Top-level Prenex Normal Form converter.
+
+### Dual Skolemization and Herbrandization
+- `skolemize_formula(formula, drop_universal, prefix)`: Replaces existential quantifiers with Skolem functions/constants for satisfiability and refutation.
+- `herbrandize_formula(formula, drop_existential, prefix)`: Dual Skolemization replacing universal quantifiers with Herbrand functions/constants for direct validity checking.
+- `skolemize_to_clauses(formula)`: Complete clausal pipeline converting formula to clausal SNF.
+
+### Herbrand Universe and Base
+- `FolSignature`: First-order signature container for constants, functions, and predicates.
+- `extract_fol_signature(items, default_constant)`: Extracts signature with guaranteed non-empty domain.
+- `herbrand_universe_level(constants, functions, level)`: Inductive construction of H_level terms.
+- `herbrand_universe_strata(constants, functions, max_level)`: Layer-by-layer term strata.
+- `herbrand_universe_stream(constants, functions)`: Infinite lazy generator for Herbrand terms.
+- `herbrand_universe(items, max_level)`: Direct universe generation.
+- `herbrand_base_level(predicates, terms)`: Generation of atomic ground formulas.
+- `herbrand_base(items, max_level)`: Direct base generation.
+
+### Herbrand Expansion Prover
+- `ground_instances_of_clause(clause, ground_terms)`: Generates all ground instances of a clause.
+- `ground_instances_of_clauses(clauses, ground_terms)`: Generates ground instances for clause sets.
+- `HerbrandExpansionProver(clauses)`: Refutation engine enumerating ground instances and solving via DPLL.
+- `prove_by_herbrand_expansion(formula_or_clauses, max_level)`: First-order theorem proving via Herbrand expansion.
+
+### Free-Variable Semantic Tableaux
+- `FvSignedFormula(formula, sign)`: Signed formula for free-variable tableaux.
+- `FvTableauBranch`: Branch management with free variables, gamma instantiation tracking, and closure unifiers.
+- `FreeVariableTableau(formula, max_gamma_instances)`: Free-variable tableau calculus with Alpha, Beta, Delta (Skolem), and Gamma (fresh variable) rules.
+- `prove_by_free_variable_tableau(formula, max_steps)`: Automated validity refutation via free-variable semantic tableaux.
 
 ---
 
-## 4. Verification and Testing
+## 6. Verification and Testing
 
 Run the syntax verification script:
 ```bash

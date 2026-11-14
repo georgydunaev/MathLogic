@@ -31,11 +31,21 @@ MathLogic is a formal logic and automated reasoning repository implementing prop
   - Paramodulation inference rule and equality resolution for first-order equational resolution refutations (`paramodulate`, `equality_resolution`, `prove_by_paramodulation`, `prove_equational_validity`).
   - Term Rewriting System (TRS) with syntactic matching (`match_term`), term normalization (`normalize_term`), Lexicographic Path Ordering (`lpo_greater`), critical pair calculation (`critical_pairs`), and Knuth-Bendix completion (`knuth_bendix_completion`, `solve_word_problem`).
 
+- **Herbrand Theory, Skolemization, and Semantic Tableaux (`Herbrand.py`)**:
+  - Robinson first-order syntactic unification with strict occurs-check (`robinson_unify`, `robinson_unify_all`, `robinson_unify_predicates`, `robinson_unify_atoms`).
+  - Prenex Normal Form conversion via explicit quantifier movement rules respecting variable captures and alpha-renaming (`to_prenex_by_movement`, `prenex_normal_form`, `is_prenex`, `split_prenex`).
+  - Dual Skolemization and Herbrandization (`skolemize_formula`, `herbrandize_formula`, `skolemize_to_clauses`).
+  - Signature extraction and Herbrand Universe construction (`FolSignature`, `extract_fol_signature`, `herbrand_universe_level`, `herbrand_universe_strata`, `herbrand_universe_stream`, `herbrand_universe`).
+  - Herbrand Base generation (`herbrand_base_level`, `herbrand_base`).
+  - Herbrand Expansion Theorem decision procedure and refutation prover with DPLL SAT solving (`ground_instances_of_clause`, `ground_instances_of_clauses`, `HerbrandExpansionProver`, `prove_by_herbrand_expansion`).
+  - Free-Variable Semantic Tableaux with Alpha, Beta, Delta (Skolem), and Gamma (fresh variable) rules and global MGU unification (`FvSignedFormula`, `FvTableauBranch`, `FreeVariableTableau`, `prove_by_free_variable_tableau`).
+
 - **Verification and Testing (`tests/`)**:
   - `verify_syntax.py`: Automated syntax and file integrity checker.
   - `test_propositional.py`: Unit test suite for propositional logic and DPLL.
   - `test_first_order.py`: Unit test suite for FOL terms, substitution, unification, models, and resolution.
   - `test_equational.py`: Unit test suite for congruence closure, paramodulation, and Knuth-Bendix completion.
+  - `test_herbrand.py`: Unit test suite for Prenex movement, Skolemization, Herbrand Universe/Base, Robinson unification, and Tableaux.
 
 ## Quick Start
 

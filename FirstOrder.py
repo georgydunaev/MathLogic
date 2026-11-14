@@ -1373,3 +1373,23 @@ except ImportError:
     pass
 
 
+# -------------------------------------------------------------
+# First-Order Skolemization, Herbrand Theory, and Tableaux Integration
+# -------------------------------------------------------------
+try:
+    from Herbrand import (
+        robinson_unify, robinson_unify_all, robinson_unify_predicates, robinson_unify_atoms,
+        FolSignature, extract_fol_signature,
+        is_prenex, split_prenex, to_prenex_by_movement, prenex_normal_form,
+        skolemize_formula, herbrandize_formula, skolemize_to_clauses,
+        herbrand_universe_level, herbrand_universe_strata, herbrand_universe_stream, herbrand_universe,
+        herbrand_base_level, herbrand_base,
+        ground_instances_of_clause, ground_instances_of_clauses,
+        HerbrandExpansionProver, prove_by_herbrand_expansion,
+        FvSignedFormula, FvTableauBranch, FreeVariableTableau, prove_by_free_variable_tableau,
+    )
+except ImportError:
+    pass
+
+
+
