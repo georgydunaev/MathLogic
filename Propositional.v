@@ -73,18 +73,31 @@ Qed.
 (* ------------------------------------------------------------- *)
 
 (*
-   The deductive system Prf has three axiom schemas and one inference rule:
+   The deductive system Prf has three axiom schemas and inference rules for
+   implication, conjunction, and disjunction:
    - AxK: A --> (B --> A)
    - AxS: (A --> (B --> C)) --> ((A --> B) --> (A --> C))
    - AxContra: ((A --> Bot) --> (B --> Bot)) --> (B --> A)
    - MP: Modus Ponens (from A --> B and A, infer B)
+   - ConjI: Conjunction Introduction (from A and B, infer A -/\ B)
+   - ConjEL: Left Conjunction Elimination (from A -/\ B, infer A)
+   - ConjER: Right Conjunction Elimination (from A -/\ B, infer B)
+   - DisjIL: Left Disjunction Introduction (from A, infer A -\/ B)
+   - DisjIR: Right Disjunction Introduction (from B, infer A -\/ B)
+   - DisjE: Disjunction Elimination (from A -\/ B, A --> C, and B --> C, infer C)
 *)
 
 Inductive Prf : Fo -> Prop :=
   | AxK (A B : Fo) : Prf (A --> (B --> A))
   | AxS (A B C : Fo) : Prf ((A --> (B --> C)) --> ((A --> B) --> (A --> C)))
   | AxContra (A B : Fo) : Prf (((A --> Bot) --> (B --> Bot)) --> (B --> A))
-  | MP (A B : Fo) : Prf (A --> B) -> Prf A -> Prf B.
+  | MP (A B : Fo) : Prf (A --> B) -> Prf A -> Prf B
+  | ConjI (A B : Fo) : Prf A -> Prf B -> Prf (A -/\ B)
+  | ConjEL (A B : Fo) : Prf (A -/\ B) -> Prf A
+  | ConjER (A B : Fo) : Prf (A -/\ B) -> Prf B
+  | DisjIL (A B : Fo) : Prf A -> Prf (A -\/ B)
+  | DisjIR (A B : Fo) : Prf B -> Prf (A -\/ B)
+  | DisjE (A B C : Fo) : Prf (A -\/ B) -> Prf (A --> C) -> Prf (B --> C) -> Prf C.
 
 (* ------------------------------------------------------------- *)
 (* Deduction Identity: Prf (A --> A)                             *)
@@ -107,7 +120,18 @@ Qed.
 Theorem soundness : forall f : Fo, Prf f -> isTauto f.
 Proof.
   intros f Hprf.
-  induction Hprf as [A B | A B C | A B | A B H_impl IH_impl H_A IH_A].
+  induction Hprf as [
+    A B |
+    A B C |
+    A B |
+    A B H_impl IH_impl H_A IH_A |
+    A B H_A IH_A H_B IH_B |
+    A B H_AB IH_AB |
+    A B H_AB IH_AB |
+    A B H_A IH_A |
+    A B H_B IH_B |
+    A B C H_AB IH_AB H_AC IH_AC H_BC IH_BC
+  ].
   - (* AxK: A --> (B --> A) *)
     intro v.
     simpl.
@@ -128,6 +152,43 @@ Proof.
     rewrite IH_A in IH_impl.
     simpl in IH_impl.
     exact IH_impl.
+  - (* ConjI: Prf A -> Prf B -> Prf (A -/\ B) *)
+    intro v.
+    specialize (IH_A v).
+    specialize (IH_B v).
+    simpl.
+    rewrite IH_A, IH_B.
+    reflexivity.
+  - (* ConjEL: Prf (A -/\ B) -> Prf A *)
+    intro v.
+    specialize (IH_AB v).
+    simpl in IH_AB.
+    destruct (foIb v A); destruct (foIb v B); try reflexivity; discriminate IH_AB.
+  - (* ConjER: Prf (A -/\ B) -> Prf B *)
+    intro v.
+    specialize (IH_AB v).
+    simpl in IH_AB.
+    destruct (foIb v A); destruct (foIb v B); try reflexivity; discriminate IH_AB.
+  - (* DisjIL: Prf A -> Prf (A -\/ B) *)
+    intro v.
+    specialize (IH_A v).
+    simpl.
+    rewrite IH_A.
+    reflexivity.
+  - (* DisjIR: Prf B -> Prf (A -\/ B) *)
+    intro v.
+    specialize (IH_B v).
+    simpl.
+    rewrite IH_B.
+    destruct (foIb v A); reflexivity.
+  - (* DisjE: Prf (A -\/ B) -> Prf (A --> C) -> Prf (B --> C) -> Prf C *)
+    intro v.
+    specialize (IH_AB v).
+    specialize (IH_AC v).
+    specialize (IH_BC v).
+    simpl in *.
+    destruct (foIb v A); destruct (foIb v B); destruct (foIb v C);
+      try reflexivity; try discriminate IH_AB; try discriminate IH_AC; discriminate IH_BC.
 Qed.
 
 
