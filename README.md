@@ -85,8 +85,7 @@ print("MGU:", mgu)
 
 ## Documentation
 
-See [DOCS.md](file:///botworkspace/MathLogic/DOCS.md) for detailed class references and mathematical definitions.
+- See [ARCHITECTURE_AND_THEOREMS.md](file:///botworkspace/MathLogic/ARCHITECTURE_AND_THEOREMS.md) for a comprehensive guide summarizing every formalization, theorem, axiom system, and open problem in the repository.
+- See [DOCS.md](file:///botworkspace/MathLogic/DOCS.md) for detailed class references and mathematical definitions.
+- See [notes/propositional_logic.md](file:///botworkspace/MathLogic/notes/propositional_logic.md) and [examples/propositional_logic_example.v](file:///botworkspace/MathLogic/examples/propositional_logic_example.v) for introductory Coq examples.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
